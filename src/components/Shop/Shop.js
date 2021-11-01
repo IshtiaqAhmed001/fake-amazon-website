@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import useCart from '../../hooks/useCart';
 import { addToDb, getStoredCart } from '../../utilities/fakedb';
 import Cart from '../Cart/Cart';
 import Product from '../Product/Product';
@@ -7,18 +8,24 @@ import './Shop.css';
 
 const Shop = () => {
     const [products, setProducts] = useState([]);
-    const [cart, setCart] = useState([]);
+    const [cart, setCart] = useCart();
+    const [page, setPage] = useState(0);
+    const [pageCount, setPageCount] = useState(0);
     // products to be rendered on the UI 
     const [displayProducts, setDisplayProducts] = useState([]);
+    const size = 10;
 
     useEffect(() => {
-        fetch('./products.JSON')
+        fetch(`http://localhost:5000/products?page=${page}&&size=${size}`)
             .then(res => res.json())
             .then(data => {
-                setProducts(data);
-                setDisplayProducts(data);
+                setProducts(data.products);
+                setDisplayProducts(data.products);
+                const count = data.count;
+                const pageNumber = Math.ceil(count / size);
+                setPageCount(pageNumber);
             });
-    }, []);
+    }, [page]);
 
     useEffect(() => {
         if (products.length) {
@@ -35,10 +42,21 @@ const Shop = () => {
             }
             setCart(storedCart);
         }
-    }, [products]);
+    }, []);
 
     const handleAddToCart = (product) => {
-        const newCart = [...cart, product];
+        const exists = cart.find(pd => pd.key === product.key);
+        let newCart = [];
+        if (exists) {
+            const rest = cart.filter(pd => pd.key !== product.key);
+            exists.quantity = exists.quantity + 1;
+            newCart = [...rest, product];
+        }
+        else {
+            product.quantity = 1;
+            newCart = [...cart, product];
+        }
+        console.log(newCart);
         setCart(newCart);
         // save to local storage (for now )
         addToDb(product.key);
@@ -68,6 +86,16 @@ const Shop = () => {
                             handleAddToCart={handleAddToCart}
                         ></Product>)
                     }
+                    <div className="pagination">
+                        {
+                            [...Array(pageCount).keys()]
+                                .map(number => <button
+                                    className={number === page ? 'selected' : ''}
+                                    key={number}
+                                    onClick={() => setPage(number)}
+                                >{number + 1}</button>)
+                        }
+                    </div>
                 </div>
                 <div className="cart-container">
                     <Cart cart={cart}>
